@@ -173,9 +173,7 @@ impl ChunkMap {
     /// when the total size is unknown. The victim's `end` moves back to the split point, so a
     /// worker already streaming that chunk must stop early.
     pub fn split_largest(&mut self) -> Option<Split> {
-        if self.total.is_none() {
-            return None;
-        }
+        self.total?;
         let idx = self
             .chunks
             .iter()

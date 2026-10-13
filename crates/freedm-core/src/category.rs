@@ -92,7 +92,7 @@ impl CategorySet {
     /// The category a filename belongs to, if any.
     pub fn categorize(&self, filename: &str) -> Option<&Category> {
         let ext = extension_of(filename)?;
-        self.categories.iter().find(|c| c.extensions.iter().any(|e| *e == ext))
+        self.categories.iter().find(|c| c.extensions.contains(&ext))
     }
 
     /// The folder for a filename, under `root`.

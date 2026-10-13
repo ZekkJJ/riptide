@@ -89,13 +89,11 @@ pub struct SegmentPlan {
 impl SegmentPlan {
     /// Reject a plan the engine must not attempt.
     pub fn check_supported(&self) -> Result<()> {
-        if let Some(enc) = &self.encryption {
-            if let Encryption::Drm { system } = enc {
-                return Err(Error::Manifest {
-                    kind: "stream",
-                    detail: format!("the stream is protected by {system} DRM and cannot be downloaded"),
-                });
-            }
+        if let Some(Encryption::Drm { system }) = &self.encryption {
+            return Err(Error::Manifest {
+                kind: "stream",
+                detail: format!("the stream is protected by {system} DRM and cannot be downloaded"),
+            });
         }
         if self.segments.is_empty() {
             return Err(Error::Manifest { kind: "stream", detail: "no segments in manifest".into() });

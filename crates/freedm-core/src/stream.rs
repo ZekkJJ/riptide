@@ -19,11 +19,112 @@ use futures_util::{stream, StreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
 
 /// How many segments to fetch concurrently while writing in order.
 const LOOK_AHEAD: usize = 6;
+
+/// Fetch a manifest and resolve it down to one variant's segment list.
+///
+/// `selector` is a variant id, `best`, `worst`, or a height such as `1080`.
+pub async fn resolve_manifest(
+    spec: &RequestSpec,
+    config: &DownloadConfig,
+    selector: &str,
+) -> Result<(crate::media::Variant, SegmentPlan)> {
+    use crate::media::{self, Manifest};
+
+    let client = crate::probe::client(config.proxy.as_deref(), config.timeout)?;
+    let body = fetch_text(&client, spec, &spec.url).await?;
+
+    match media::parse(&body, &spec.url)? {
+        Manifest::HlsMedia { plan } => {
+            Ok((crate::media::Variant { id: "stream".into(), ..Default::default() }, plan))
+        }
+        Manifest::HlsMaster { variants } => {
+            let chosen = pick_variant(&variants, selector).ok_or_else(|| Error::Manifest {
+                kind: "HLS",
+                detail: format!("no variant matched {selector:?}"),
+            })?;
+            let url = chosen.url.clone().ok_or_else(|| Error::Manifest {
+                kind: "HLS",
+                detail: "the chosen variant has no playlist url".into(),
+            })?;
+            let media_body = fetch_text(&client, spec, &url).await?;
+            let plan = media::parse_hls_media(&media_body, &url)?;
+            Ok((chosen, plan))
+        }
+        Manifest::Dash { streams } => {
+            let variants: Vec<_> = streams.iter().map(|(v, _)| v.clone()).collect();
+            let chosen = pick_variant(&variants, selector).ok_or_else(|| Error::Manifest {
+                kind: "DASH",
+                detail: format!("no representation matched {selector:?}"),
+            })?;
+            streams
+                .into_iter()
+                .find(|(v, _)| v.id == chosen.id)
+                .ok_or_else(|| Error::Manifest { kind: "DASH", detail: "variant vanished".into() })
+        }
+    }
+}
+
+/// Resolve a variant selector: an id, `best`, `worst`, or a height such as `1080`.
+pub fn pick_variant(
+    variants: &[crate::media::Variant],
+    selector: &str,
+) -> Option<crate::media::Variant> {
+    // Prefer the video renditions when there are any; an audio-only manifest falls back to
+    // the whole list so that it still resolves.
+    let video: Vec<&crate::media::Variant> =
+        variants.iter().filter(|v| !v.is_audio_only).collect();
+    let pool: Vec<&crate::media::Variant> =
+        if video.is_empty() { variants.iter().collect() } else { video };
+
+    let chosen = match selector {
+        // Both parsers return their lists sorted best first.
+        "best" => pool.first().copied(),
+        "worst" => pool.last().copied(),
+        s => pool
+            .iter()
+            .find(|v| v.id == s)
+            .copied()
+            .or_else(|| {
+                // A bare number, with or without a trailing "p", selects by height.
+                let height: u32 = s.trim_end_matches('p').parse().ok()?;
+                pool.iter().find(|v| v.resolution.is_some_and(|(_, h)| h == height)).copied()
+            }),
+    };
+    chosen.cloned()
+}
+
+/// A sensible output name for a stream, derived from the manifest URL.
+pub fn stream_filename(manifest_url: &str, plan: &SegmentPlan) -> String {
+    let path = manifest_url.split(['?', '#']).next().unwrap_or(manifest_url);
+    // The manifest is usually `<name>/index.m3u8` or `<name>.m3u8`; prefer the directory name
+    // when the file itself is a generic index.
+    let parts: Vec<&str> = path.rsplit('/').filter(|s| !s.is_empty()).collect();
+    let file = parts.first().copied().unwrap_or("stream");
+    let stem = file.rsplit_once('.').map(|(a, _)| a).unwrap_or(file);
+    let base = if matches!(stem, "index" | "master" | "manifest" | "playlist" | "stream") {
+        parts.get(1).copied().unwrap_or(stem)
+    } else {
+        stem
+    };
+    // fMP4 streams carry an init segment; MPEG-TS ones do not.
+    let ext = if plan.init.is_some() { "mp4" } else { "ts" };
+    crate::probe::sanitize_filename(&format!("{base}.{ext}"))
+}
+
+async fn fetch_text(client: &Client, spec: &RequestSpec, url: &str) -> Result<String> {
+    let resp = client.get(url).headers(spec.headers(None)).send().await?;
+    if !resp.status().is_success() {
+        return Err(Error::BadStatus { status: resp.status().as_u16(), url: url.to_string() });
+    }
+    Ok(resp.text().await?)
+}
 
 /// Resume state for a stream, which advances by whole segments rather than by byte ranges.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,13 +139,16 @@ struct StreamState {
 
 /// Fetch every segment of `plan` into `dir/name`, reporting progress as segments complete.
 ///
-/// `on_progress` receives `(segments_done, segments_total, bytes_written)`.
+/// `on_progress` receives `(segments_done, segments_total, bytes_written)`. Setting `cancel`
+/// stops the download at the next segment boundary, leaving the partial file and its
+/// checkpoint in place so it can be resumed.
 pub async fn download_plan<F>(
     plan: &SegmentPlan,
     dir: impl AsRef<Path>,
     name: &str,
     spec: &RequestSpec,
     config: DownloadConfig,
+    cancel: Arc<AtomicBool>,
     mut on_progress: F,
 ) -> Result<PathBuf>
 where
@@ -112,6 +216,12 @@ where
     .buffered(LOOK_AHEAD);
 
     while let Some((index, result)) = fetches.next().await {
+        if cancel.load(Ordering::Relaxed) {
+            use tokio::io::AsyncWriteExt;
+            file.flush().await.map_err(|e| Error::io(&paths.part_path, e))?;
+            save_stream_state(&state_path, done, bytes, total).await;
+            return Err(Error::Cancelled);
+        }
         let data = result?;
         let plain = match &key {
             Some((key_bytes, iv)) => decrypt_segment(&data, key_bytes, iv.as_deref(), index)?,
@@ -357,6 +467,59 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
+    fn variant(id: &str, height: u32, bw: u64, audio: bool) -> crate::media::Variant {
+        crate::media::Variant {
+            id: id.into(),
+            bandwidth: Some(bw),
+            resolution: if audio { None } else { Some((height * 16 / 9, height)) },
+            is_audio_only: audio,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn variant_selectors_resolve_as_documented() {
+        // Both parsers hand back their lists sorted best first.
+        let vs = vec![
+            variant("v1080", 1080, 5_000_000, false),
+            variant("v720", 720, 2_400_000, false),
+            variant("v360", 360, 800_000, false),
+            variant("audio", 0, 128_000, true),
+        ];
+        assert_eq!(pick_variant(&vs, "best").unwrap().id, "v1080");
+        assert_eq!(pick_variant(&vs, "v720").unwrap().id, "v720");
+        assert_eq!(pick_variant(&vs, "720").unwrap().id, "v720");
+        assert_eq!(pick_variant(&vs, "720p").unwrap().id, "v720");
+        // "worst" means the lowest video rendition, not the audio track.
+        assert_eq!(pick_variant(&vs, "v360").unwrap().id, "v360");
+        assert_eq!(pick_variant(&vs, "worst").unwrap().id, "v360");
+        assert!(pick_variant(&vs, "4320").is_none());
+        assert!(pick_variant(&vs, "nonsense").is_none());
+    }
+
+    #[test]
+    fn an_audio_only_manifest_still_resolves() {
+        let vs = vec![variant("a128", 0, 128_000, true)];
+        assert_eq!(pick_variant(&vs, "best").unwrap().id, "a128");
+        assert_eq!(pick_variant(&vs, "worst").unwrap().id, "a128");
+    }
+
+    #[test]
+    fn stream_names_come_from_the_manifest_url() {
+        let ts = SegmentPlan::default();
+        let fmp4 = SegmentPlan { init: Some(Segment::default()), ..Default::default() };
+
+        // A named playlist gives its own stem.
+        assert_eq!(stream_filename("https://cdn.example/x36xhzz.m3u8", &ts), "x36xhzz.ts");
+        // A generic index borrows the directory name instead, which is the meaningful part.
+        assert_eq!(stream_filename("https://cdn.example/my-film/index.m3u8", &ts), "my-film.ts");
+        assert_eq!(stream_filename("https://cdn.example/ep12/master.m3u8", &ts), "ep12.ts");
+        // Query strings are not part of the name.
+        assert_eq!(stream_filename("https://cdn.example/clip.m3u8?token=a.b", &ts), "clip.ts");
+        // An init segment means fragmented MP4 rather than a transport stream.
+        assert_eq!(stream_filename("https://cdn.example/show/manifest.mpd", &fmp4), "show.mp4");
+    }
+
     #[tokio::test]
     async fn a_drm_plan_is_refused_before_any_request_is_made() {
         let plan = SegmentPlan {
@@ -370,6 +533,7 @@ mod tests {
             "x.ts",
             &RequestSpec::new("https://e/m.m3u8"),
             DownloadConfig::default(),
+            Arc::new(AtomicBool::new(false)),
             |_, _, _| {},
         )
         .await

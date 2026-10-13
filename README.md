@@ -152,7 +152,7 @@ docs/ANALYSIS.md         how IDM works, and why FreeDM differs
 cargo test --workspace
 ```
 
-125 tests, covering the chunk-tiling invariants, out-of-order segment reassembly, resume
+126 tests, covering the chunk-tiling invariants, out-of-order segment reassembly, resume
 validation, filename sanitisation (including traversal attempts in server-supplied names),
 manifest parsing, AES-128 round trips, rate limiting under a paused clock, and API
 authentication.

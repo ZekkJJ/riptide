@@ -207,7 +207,7 @@ impl Download {
         config: DownloadConfig,
     ) -> Result<Self> {
         let client = probe::client(config.proxy.as_deref(), config.timeout)?;
-        let info = probe_with_mirrors(&client, &spec).await?;
+        let info = probe_with_mirrors(&client, &spec, config.max_retries).await?;
 
         let name = filename
             .map(|n| probe::sanitize_filename(&n))
@@ -367,7 +367,7 @@ impl Download {
 
         // A server that over-reported its length leaves tail bytes that were never written.
         if let Some(total) = info.total {
-            if shared.file.len().map_err(|e| Error::io(shared.file.path(), e))? > total {
+            if shared.file.size().map_err(|e| Error::io(shared.file.path(), e))? > total {
                 shared.file.truncate(total).await.map_err(|e| Error::io(shared.file.path(), e))?;
             }
         }
@@ -400,22 +400,43 @@ fn new_map(info: &ResourceInfo, config: &DownloadConfig) -> ChunkMap {
 }
 
 /// Probe the primary URL, falling back to mirrors when it will not answer.
-async fn probe_with_mirrors(client: &Client, spec: &RequestSpec) -> Result<ResourceInfo> {
-    let mut last = match probe::probe(client, spec).await {
-        Ok(info) => return Ok(info),
-        Err(e) => e,
-    };
-    for mirror in &spec.mirrors {
-        let alt = RequestSpec { url: mirror.clone(), ..spec.clone() };
-        match probe::probe(client, &alt).await {
-            Ok(info) => {
-                tracing::info!(%mirror, "primary url failed, using mirror");
-                return Ok(info);
+///
+/// The whole sequence is retried for transient faults. Without this a single connection blip
+/// at probe time kills the download outright, which is a worse outcome than anything that can
+/// happen later: once transferring, every segment already retries, so the probe was the one
+/// step with no second chance.
+async fn probe_with_mirrors(
+    client: &Client,
+    spec: &RequestSpec,
+    max_retries: u32,
+) -> Result<ResourceInfo> {
+    let mut attempt = 0;
+    loop {
+        let mut last = match probe::probe(client, spec).await {
+            Ok(info) => return Ok(info),
+            Err(e) => e,
+        };
+        for mirror in &spec.mirrors {
+            let alt = RequestSpec { url: mirror.clone(), ..spec.clone() };
+            match probe::probe(client, &alt).await {
+                Ok(info) => {
+                    tracing::info!(%mirror, "primary url failed, using mirror");
+                    return Ok(info);
+                }
+                Err(e) => last = e,
             }
-            Err(e) => last = e,
         }
+
+        // An expired link, a 404 or a changed file will not fix itself by asking again.
+        if !last.is_retryable() || attempt >= max_retries {
+            return Err(last);
+        }
+        attempt += 1;
+        let delay = Duration::from_millis(500 * (1u64 << attempt.min(5)))
+            .min(Duration::from_secs(15));
+        tracing::debug!(attempt, ?delay, error = %last, "probe failed, retrying");
+        tokio::time::sleep(delay).await;
     }
-    Err(last)
 }
 
 /// One connection slot: claim work, transfer it, repeat.

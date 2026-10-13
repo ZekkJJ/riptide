@@ -86,7 +86,7 @@ impl ResumeState {
             std::fs::rename(&tmp, &path)
         })
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .map_err(std::io::Error::other)?
     }
 
     /// Read the state file, treating anything unreadable or malformed as simply absent: a

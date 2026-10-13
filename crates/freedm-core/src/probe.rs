@@ -411,7 +411,7 @@ fn percent_decode(s: &str) -> Vec<u8> {
 
 fn filename_from_url(url: &str) -> Option<String> {
     let parsed = url::Url::parse(url).ok()?;
-    let last = parsed.path_segments()?.filter(|s| !s.is_empty()).next_back()?;
+    let last = parsed.path_segments()?.rfind(|s| !s.is_empty())?;
     let decoded = percent_encoding::percent_decode_str(last).decode_utf8_lossy().to_string();
     if decoded.trim().is_empty() {
         None
@@ -517,7 +517,7 @@ pub fn sanitize_filename(name: &str) -> String {
 
 fn base64(input: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for c in input.chunks(3) {
         let b = [c[0], *c.get(1).unwrap_or(&0), *c.get(2).unwrap_or(&0)];
         let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;

@@ -73,6 +73,7 @@ pub fn router(manager: Arc<Manager>, token: String) -> Router {
 }
 
 /// Reject anything that does not present the shared secret.
+#[allow(clippy::result_large_err)] // the Err case is the rejection response itself
 fn authorize(ctx: &Ctx, headers: &HeaderMap, query_token: Option<&str>) -> Result<(), Response> {
     let supplied = headers
         .get(TOKEN_HEADER)

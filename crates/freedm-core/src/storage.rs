@@ -61,7 +61,15 @@ impl SparseFile {
                 std::fs::create_dir_all(parent)?;
             }
         }
-        let file = OpenOptions::new().read(true).write(true).create(true).open(&path)?;
+        // truncate(false) is deliberate and load-bearing: this same call reopens the
+        // partial file of a resumed download, and truncating would throw away every byte
+        // already fetched.
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)?;
         if let Some(total) = total {
             // Only ever grow: a resumed download must not truncate bytes already written.
             if file.metadata()?.len() < total {
@@ -75,7 +83,8 @@ impl SparseFile {
         &self.path
     }
 
-    pub fn len(&self) -> io::Result<u64> {
+    /// Current length of the file on disk.
+    pub fn size(&self) -> io::Result<u64> {
         Ok(self.file.metadata()?.len())
     }
 
@@ -102,7 +111,7 @@ impl SparseFile {
         let me = self.clone();
         tokio::task::spawn_blocking(move || me.write_all_at(&buf, offset))
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
     }
 
     /// Push file data and metadata to disk.
@@ -110,7 +119,7 @@ impl SparseFile {
         let file = self.file.clone();
         tokio::task::spawn_blocking(move || file.sync_all())
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
     }
 
     /// Cut the file down to its true length, for a stream whose size was unknown until the end
@@ -119,7 +128,7 @@ impl SparseFile {
         let file = self.file.clone();
         tokio::task::spawn_blocking(move || file.set_len(len))
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
     }
 }
 
@@ -221,7 +230,7 @@ impl DownloadPaths {
             Ok::<_, io::Error>(())
         })
         .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+        .map_err(io::Error::other)?
     }
 
     /// Delete the partial payload and its state, for a cancelled download.
@@ -232,7 +241,7 @@ impl DownloadPaths {
             let _ = std::fs::remove_file(&state);
         })
         .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        .map_err(io::Error::other)
     }
 }
 
@@ -360,11 +369,11 @@ mod tests {
 
         // Re-opening with a smaller declared total must leave the existing bytes alone.
         let f = SparseFile::open(&path, Some(1000)).unwrap();
-        assert_eq!(f.len().unwrap(), 5000);
+        assert_eq!(f.size().unwrap(), 5000);
 
         // A larger total grows the file.
         let f = SparseFile::open(&path, Some(9000)).unwrap();
-        assert_eq!(f.len().unwrap(), 9000);
+        assert_eq!(f.size().unwrap(), 9000);
         std::fs::remove_dir_all(&dir).ok();
     }
 

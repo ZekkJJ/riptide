@@ -18,6 +18,8 @@ pub struct AppConfig {
     pub max_concurrent_downloads: usize,
     /// Ceiling across all downloads, in bytes per second. 0 for unlimited.
     pub global_speed_limit: u64,
+    /// Attempts per segment, and for the initial probe, before giving up.
+    pub max_retries: u32,
     pub proxy: Option<String>,
     /// Port the local API listens on, bound to the loopback interface only.
     pub port: u16,
@@ -40,6 +42,7 @@ impl Default for AppConfig {
             connections_per_download: 8,
             max_concurrent_downloads: 3,
             global_speed_limit: 0,
+            max_retries: 5,
             proxy: None,
             port: 7739,
             token: generate_token(),
@@ -114,6 +117,7 @@ impl AppConfig {
     pub fn engine_config(&self) -> freedm_core::DownloadConfig {
         freedm_core::DownloadConfig {
             max_connections: self.connections_per_download.clamp(1, 64),
+            max_retries: self.max_retries,
             proxy: self.proxy.clone(),
             // The per-download limit is derived from the global one so that the configured
             // ceiling is respected no matter how many downloads are running.
@@ -174,9 +178,8 @@ mod tests {
 
     #[test]
     fn the_global_limit_is_shared_out_across_concurrent_downloads() {
-        let mut cfg = AppConfig::default();
-        cfg.global_speed_limit = 3_000_000;
-        cfg.max_concurrent_downloads = 3;
+        let mut cfg =
+            AppConfig { global_speed_limit: 3_000_000, max_concurrent_downloads: 3, ..Default::default() };
         // Three downloads at a third each keeps the total at the configured ceiling.
         assert_eq!(cfg.engine_config().speed_limit, 1_000_000);
 
@@ -186,8 +189,7 @@ mod tests {
 
     #[test]
     fn connection_counts_are_clamped_to_something_sane() {
-        let mut cfg = AppConfig::default();
-        cfg.connections_per_download = 0;
+        let mut cfg = AppConfig { connections_per_download: 0, ..Default::default() };
         assert_eq!(cfg.engine_config().max_connections, 1);
         cfg.connections_per_download = 9999;
         assert_eq!(cfg.engine_config().max_connections, 64);

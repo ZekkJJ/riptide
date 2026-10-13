@@ -7,6 +7,8 @@ use freedm_core::media::{self, Manifest};
 use freedm_core::{Download, DownloadConfig, Progress, RequestSpec};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Parser)]
@@ -523,108 +525,64 @@ fn describe_encryption(enc: Option<&media::Encryption>) {
 }
 
 async fn download_stream(url: &str, opts: DownloadOpts) -> Result<()> {
-    let body = fetch_text(url, &opts).await?;
-    let manifest = media::parse(&body, url)?;
+    let spec = opts.spec(url)?;
+    let config = opts.config();
 
-    // Resolve the chosen variant down to a concrete segment list.
-    let (label, plan) = match manifest {
-        Manifest::HlsMedia { plan } => ("stream".to_string(), plan),
-        Manifest::HlsMaster { variants } => {
-            let chosen = pick_variant(&variants, &opts.variant)
-                .context("no variant matched; run `freedm variants <url>` to see the list")?;
-            let media_url = chosen
-                .url
-                .clone()
-                .context("the chosen variant has no playlist url")?;
-            eprintln!("variant: {} {}", chosen.id, chosen.label());
-            let media_body = fetch_text(&media_url, &opts).await?;
-            let plan = media::parse_hls_media(&media_body, &media_url)?;
-            (chosen.label(), plan)
-        }
-        Manifest::Dash { streams } => {
-            let variants: Vec<_> = streams.iter().map(|(v, _)| v.clone()).collect();
-            let chosen = pick_variant(&variants, &opts.variant)
-                .context("no variant matched; run `freedm variants <url>` to see the list")?;
-            let (v, plan) = streams
-                .into_iter()
-                .find(|(v, _)| v.id == chosen.id)
-                .context("variant disappeared")?;
-            eprintln!("variant: {} {}", v.id, v.label());
-            (v.label(), plan)
-        }
-    };
+    let (variant, plan) = freedm_core::stream::resolve_manifest(&spec, &config, &opts.variant)
+        .await
+        .map_err(report)?;
+    eprintln!("variant: {} {}", variant.id, variant.label());
 
-    plan.check_supported()?;
+    plan.check_supported().map_err(report)?;
     if plan.live {
         bail!(
-            "this is a live stream with no end, so it cannot be downloaded as a file; \
-             FreeDM only fetches finished (VOD) streams"
+            "this is a live stream with no end, so it cannot be downloaded as a file;              FreeDM only fetches finished (VOD) streams"
         );
     }
 
-    let name = opts.output.clone().unwrap_or_else(|| {
-        let stem = url
-            .split(['?', '#'])
-            .next()
-            .and_then(|u| u.rsplit('/').nth(1))
-            .unwrap_or("stream");
-        format!("{stem}.{}", if plan.init.is_some() { "mp4" } else { "ts" })
-    });
+    let name = opts
+        .output
+        .clone()
+        .unwrap_or_else(|| freedm_core::stream::stream_filename(url, &plan));
     let dir = opts.dest_dir(&name);
 
-    freedm_core::stream::download_plan(
+    // Ctrl-C stops at the next segment boundary, leaving a resumable checkpoint.
+    let cancel = Arc::new(AtomicBool::new(false));
+    let signal = {
+        let cancel = cancel.clone();
+        tokio::spawn(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                eprintln!("\nstopping after the current segment...");
+                cancel.store(true, Ordering::Relaxed);
+            }
+        })
+    };
+
+    let result = freedm_core::stream::download_plan(
         &plan,
         &dir,
         &name,
-        &opts.spec(url)?,
-        opts.config(),
+        &spec,
+        config,
+        cancel,
         |done, total, bytes| {
-            eprint!(
-                "\r  segment {done}/{total}  {}          ",
-                human_bytes(bytes)
-            );
+            eprint!("\r  segment {done}/{total}  {}          ", human_bytes(bytes));
         },
     )
-    .await
-    .map(|path| {
-        eprintln!();
-        println!("{}", path.display());
-    })
-    .map_err(report)?;
+    .await;
+    signal.abort();
+    eprintln!();
 
-    let _ = label;
-    Ok(())
-}
-
-/// Resolve a variant selector: an id, `best`, `worst`, or a height such as `1080`.
-fn pick_variant<'a>(
-    variants: &'a [freedm_core::media::Variant],
-    selector: &str,
-) -> Option<&'a freedm_core::media::Variant> {
-    let video: Vec<&freedm_core::media::Variant> =
-        variants.iter().filter(|v| !v.is_audio_only).collect();
-    let pool: &[&freedm_core::media::Variant] =
-        if video.is_empty() { &[] } else { &video };
-    let pool: Vec<&freedm_core::media::Variant> =
-        if pool.is_empty() { variants.iter().collect() } else { pool.to_vec() };
-
-    match selector {
-        // The lists are already sorted best first.
-        "best" => pool.first().copied(),
-        "worst" => pool.last().copied(),
-        s => {
-            if let Some(v) = pool.iter().find(|v| v.id == s) {
-                return Some(v);
-            }
-            // A bare number selects by height.
-            if let Ok(height) = s.trim_end_matches('p').parse::<u32>() {
-                return pool
-                    .iter()
-                    .find(|v| v.resolution.is_some_and(|(_, h)| h == height))
-                    .copied();
-            }
-            None
+    match result {
+        Ok(path) => {
+            println!("{}", path.display());
+            Ok(())
         }
+        Err(freedm_core::Error::Cancelled) => {
+            eprintln!("stopped; run the same command again to carry on");
+            Ok(())
+        }
+        Err(e) => Err(report(e)),
     }
 }
 
@@ -662,46 +620,13 @@ mod tests {
 
     #[test]
     fn headers_must_be_name_colon_value() {
-        let mut opts = DownloadOpts::default();
-        opts.headers = vec!["X-Token: abc123".into()];
+        let mut opts =
+            DownloadOpts { headers: vec!["X-Token: abc123".into()], ..Default::default() };
         let spec = opts.spec("https://e.com/f").unwrap();
         assert_eq!(spec.headers.get("X-Token").unwrap(), "abc123");
 
         opts.headers = vec!["malformed".into()];
         assert!(opts.spec("https://e.com/f").is_err());
-    }
-
-    fn variant(id: &str, h: u32, bw: u64, audio: bool) -> freedm_core::media::Variant {
-        freedm_core::media::Variant {
-            id: id.into(),
-            bandwidth: Some(bw),
-            resolution: if audio { None } else { Some((h * 16 / 9, h)) },
-            is_audio_only: audio,
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn variant_selectors_resolve_as_documented() {
-        // Sorted best first, as the parsers return them.
-        let vs = vec![
-            variant("v1080", 1080, 5_000_000, false),
-            variant("v720", 720, 2_400_000, false),
-            variant("v360", 360, 800_000, false),
-            variant("audio", 0, 128_000, true),
-        ];
-        assert_eq!(pick_variant(&vs, "best").unwrap().id, "v1080");
-        assert_eq!(pick_variant(&vs, "worst").unwrap().id, "v360", "audio is not the worst video");
-        assert_eq!(pick_variant(&vs, "v720").unwrap().id, "v720");
-        assert_eq!(pick_variant(&vs, "720").unwrap().id, "v720");
-        assert_eq!(pick_variant(&vs, "720p").unwrap().id, "v720");
-        assert!(pick_variant(&vs, "4320").is_none());
-    }
-
-    #[test]
-    fn an_audio_only_manifest_still_resolves() {
-        let vs = vec![variant("a128", 0, 128_000, true)];
-        assert_eq!(pick_variant(&vs, "best").unwrap().id, "a128");
     }
 
     #[test]

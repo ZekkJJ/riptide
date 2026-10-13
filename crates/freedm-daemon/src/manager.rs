@@ -5,6 +5,7 @@ use freedm_core::{Download, DownloadHandle, Progress, RequestSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex, Notify};
 use uuid::Uuid;
@@ -53,6 +54,9 @@ struct Entry {
     spec: RequestSpec,
     filename_override: Option<String>,
     handle: Option<DownloadHandle>,
+    /// Stop flag for a stream download, which fetches a segment list rather than byte ranges
+    /// and so has no [`DownloadHandle`] to drive.
+    stream_cancel: Option<Arc<AtomicBool>>,
 }
 
 /// An event pushed to connected clients.
@@ -159,7 +163,13 @@ impl Manager {
             let mut state = self.state.lock().await;
             state.entries.insert(
                 id,
-                Entry { item: item.clone(), spec, filename_override: filename, handle: None },
+                Entry {
+                    item: item.clone(),
+                    spec,
+                    filename_override: filename,
+                    handle: None,
+                    stream_cancel: None,
+                },
             );
             state.order.push(id);
         }
@@ -177,6 +187,11 @@ impl Manager {
             Status::Running | Status::Starting => {
                 if let Some(h) = &entry.handle {
                     h.pause();
+                }
+                // A stream stops at the next segment boundary, leaving a resumable
+                // checkpoint; resuming re-queues it and it carries on from there.
+                if let Some(flag) = &entry.stream_cancel {
+                    flag.store(true, Ordering::Relaxed);
                 }
                 entry.item.status = Status::Paused;
                 let item = entry.item.clone();
@@ -226,6 +241,9 @@ impl Manager {
         if let Some(h) = &entry.handle {
             h.cancel();
         }
+        if let Some(flag) = &entry.stream_cancel {
+            flag.store(true, Ordering::Relaxed);
+        }
         entry.item.status = Status::Cancelled;
         let item = entry.item.clone();
         drop(state);
@@ -243,6 +261,9 @@ impl Manager {
 
         if let Some(h) = &entry.handle {
             h.cancel();
+        }
+        if let Some(flag) = &entry.stream_cancel {
+            flag.store(true, Ordering::Relaxed);
         }
         if delete_file {
             if let Some(path) = &entry.item.path {
@@ -342,6 +363,13 @@ impl Manager {
         filename: Option<String>,
         config: AppConfig,
     ) {
+        // An HLS or DASH URL names a segment list, not a file. Saving it as-is would write a
+        // one-kilobyte playlist where the user expected a video, so it takes the stream path.
+        if freedm_core::media::looks_like_manifest(&spec.url, None) {
+            self.run_stream(id, spec, filename, config).await;
+            return;
+        }
+
         // The destination depends on the filename, which only the probe knows. Prepare into
         // the root first, then let the engine settle the final path.
         let dest = config.download_dir.clone();
@@ -463,6 +491,154 @@ impl Manager {
         self.wake.notify_one();
     }
 
+    /// Fetch an adaptive stream as a single file, mirroring progress into the list.
+    async fn run_stream(
+        self: Arc<Self>,
+        id: Uuid,
+        spec: RequestSpec,
+        filename: Option<String>,
+        config: AppConfig,
+    ) {
+        let engine = config.engine_config();
+        let resolved = freedm_core::stream::resolve_manifest(&spec, &engine, "best").await;
+        let (variant, plan) = match resolved {
+            Ok(v) => v,
+            Err(e) => return self.finish(id, Status::Failed, None, Some(e.to_string())).await,
+        };
+
+        if let Err(e) = plan.check_supported() {
+            return self.finish(id, Status::Failed, None, Some(e.to_string())).await;
+        }
+        if plan.live {
+            return self
+                .finish(
+                    id,
+                    Status::Failed,
+                    None,
+                    Some("this is a live stream with no end, so it cannot be saved as a file".into()),
+                )
+                .await;
+        }
+
+        let name = filename
+            .unwrap_or_else(|| freedm_core::stream::stream_filename(&spec.url, &plan));
+        let dir = if config.categorize {
+            config.categories.folder_for(&config.download_dir, &name)
+        } else {
+            config.download_dir.clone()
+        };
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let total_segments = plan.total_segments();
+
+        {
+            let mut state = self.state.lock().await;
+            if let Some(entry) = state.entries.get_mut(&id) {
+                if entry.item.status == Status::Cancelled {
+                    cancel.store(true, Ordering::Relaxed);
+                }
+                entry.item.filename = name.clone();
+                entry.item.path = Some(dir.join(&name));
+                entry.item.progress.segments = total_segments;
+                if entry.item.status == Status::Starting {
+                    entry.item.status = Status::Running;
+                }
+                entry.stream_cancel = Some(cancel.clone());
+                let item = entry.item.clone();
+                drop(state);
+                let _ = self.events.send(Event::Updated { item });
+            }
+        }
+        tracing::info!(variant = %variant.label(), segments = total_segments, "fetching stream");
+
+        // The progress callback is synchronous, so it parks the numbers in a shared cell and a
+        // ticker publishes them, rather than blocking a segment write on the manager lock.
+        let shared = Arc::new(std::sync::Mutex::new((0usize, total_segments, 0u64)));
+        let publisher = {
+            let me = self.clone();
+            let shared = shared.clone();
+            tokio::spawn(async move {
+                let mut ticker = tokio::time::interval(std::time::Duration::from_millis(500));
+                // Bytes land only when a whole segment finishes, so a per-tick delta is zero
+                // for most ticks even on a healthy stream. Speed is averaged over a longer
+                // window, and "stalled" is judged by how long it has been since the byte
+                // count last moved at all rather than by the instantaneous rate.
+                let started = std::time::Instant::now();
+                let mut window = std::collections::VecDeque::<(std::time::Instant, u64)>::new();
+                let mut last_bytes = 0u64;
+                let mut last_change = started;
+
+                loop {
+                    ticker.tick().await;
+                    let (done, total, bytes) = *shared.lock().unwrap();
+                    let now = std::time::Instant::now();
+
+                    if bytes != last_bytes {
+                        last_change = now;
+                        last_bytes = bytes;
+                    }
+                    window.push_back((now, bytes));
+                    while window.front().is_some_and(|(t, _)| now.duration_since(*t).as_secs() > 5)
+                    {
+                        window.pop_front();
+                    }
+                    let speed = match (window.front(), window.back()) {
+                        (Some((t0, b0)), Some((t1, b1))) => {
+                            let secs = t1.duration_since(*t0).as_secs_f64();
+                            if secs > 0.5 { ((b1 - b0) as f64 / secs) as u64 } else { 0 }
+                        }
+                        _ => 0,
+                    };
+
+                    let mut state = me.state.lock().await;
+                    let Some(entry) = state.entries.get_mut(&id) else { break };
+                    entry.item.progress.downloaded = bytes;
+                    entry.item.progress.segments = total;
+                    entry.item.progress.connections = if done < total { 1 } else { 0 };
+                    entry.item.progress.speed = speed;
+                    entry.item.progress.stalled =
+                        done < total && now.duration_since(last_change).as_secs() >= 15;
+                    let item = entry.item.clone();
+                    drop(state);
+                    let _ = me.events.send(Event::Updated { item });
+                }
+            })
+        };
+
+        let result = freedm_core::stream::download_plan(
+            &plan,
+            &dir,
+            &name,
+            &spec,
+            engine,
+            cancel,
+            move |done, total, bytes| {
+                if let Ok(mut cell) = shared.lock() {
+                    *cell = (done, total, bytes);
+                }
+            },
+        )
+        .await;
+        publisher.abort();
+
+        match result {
+            Ok(path) => self.finish(id, Status::Done, Some(path), None).await,
+            Err(freedm_core::Error::Cancelled) => {
+                let paused = self.get(id).await.is_some_and(|i| i.status == Status::Paused);
+                if paused {
+                    let mut state = self.state.lock().await;
+                    if let Some(entry) = state.entries.get_mut(&id) {
+                        entry.stream_cancel = None;
+                    }
+                } else {
+                    self.finish(id, Status::Cancelled, None, None).await;
+                }
+            }
+            Err(e) => self.finish(id, Status::Failed, None, Some(e.to_string())).await,
+        }
+        self.wake.notify_one();
+    }
+
     async fn finish(
         self: &Arc<Self>,
         id: Uuid,
@@ -475,16 +651,29 @@ impl Manager {
         entry.item.status = status;
         entry.item.error = error;
         entry.handle = None;
+        entry.stream_cancel = None;
         if let Some(p) = path {
             entry.item.path = Some(p);
         }
         if status == Status::Done {
             entry.item.progress.done = true;
-            if let Some(total) = entry.item.progress.total {
-                entry.item.progress.downloaded = total;
+            match entry.item.progress.total {
+                Some(total) => entry.item.progress.downloaded = total,
+                // A stream has no byte total until it is fetched, and the progress ticker is
+                // stopped before the final segments are counted, so take the truth from the
+                // finished file rather than leaving a stale figure on screen.
+                None => {
+                    if let Some(size) =
+                        entry.item.path.as_ref().and_then(|p| std::fs::metadata(p).ok()).map(|m| m.len())
+                    {
+                        entry.item.progress.downloaded = size;
+                        entry.item.progress.total = Some(size);
+                    }
+                }
             }
             entry.item.progress.speed = 0;
             entry.item.progress.connections = 0;
+            entry.item.progress.stalled = false;
         }
         let item = entry.item.clone();
         drop(state);
@@ -501,6 +690,8 @@ mod tests {
             download_dir: std::env::temp_dir().join("freedm-mgr-test"),
             max_concurrent_downloads: 2,
             categorize: false,
+            // Fail fast: these tests point at a dead port and should not sit through backoff.
+            max_retries: 0,
             ..Default::default()
         }
     }
