@@ -9,7 +9,7 @@ and HLS/DASH video — with no licence key, no trial, and no kernel driver.
 
 [![CI](https://github.com/ZekkJJ/riptide/actions/workflows/ci.yml/badge.svg)](https://github.com/ZekkJJ/riptide/actions/workflows/ci.yml)
 [![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
-[![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange)](https://www.rust-lang.org)
+[![Rust 1.89+](https://img.shields.io/badge/rust-1.89%2B-orange)](https://www.rust-lang.org)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#quick-start)
 
 </div>
@@ -59,7 +59,7 @@ Two binaries land in `target/release/`:
 `riptide` is the command line tool. `riptided` is the background service: it runs the queue,
 serves a web UI at <http://127.0.0.1:7739/>, and is what the browser extension talks to.
 
-Rust 1.82 or newer is the only requirement. TLS is `rustls` and the crypto is pure Rust, so
+Rust 1.89 or newer is the only requirement. TLS is `rustls` and the crypto is pure Rust, so
 there is no OpenSSL to install.
 
 ## Command line

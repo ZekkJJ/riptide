@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.89"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/ZekkJJ/riptide"
 authors = ["Riptide contributors"]
@@ -25,9 +25,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4", features = ["derive"] }
 axum = { version = "0.7", features = ["ws"] }
 tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
-quick-xml = "0.37"
+quick-xml = "0.42"
 dirs = "5"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 percent-encoding = "2"
-indicatif = "0.17"
+indicatif = "0.18"

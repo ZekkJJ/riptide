@@ -394,7 +394,7 @@ pub fn parse_dash(xml: &str, base_url: &str) -> Result<Vec<(Variant, SegmentPlan
                 p.start(&name, attributes(&e));
                 p.end(&name);
             }
-            Ok(Event::Text(t)) => p.text(&t.unescape().unwrap_or_default()),
+            Ok(Event::Text(t)) => p.text(t.into_inner().as_ref()),
             Ok(Event::End(e)) => {
                 let name = local_name(e.name().as_ref());
                 p.end(&name);
@@ -823,16 +823,22 @@ fn drm_system(attrs: &std::collections::HashMap<String, String>) -> Option<Strin
     drm_system_name(attrs.get("schemeIdUri")?)
 }
 
-fn local_name(raw: &[u8]) -> String {
-    let s = String::from_utf8_lossy(raw);
-    s.rsplit(':').next().unwrap_or(&s).to_string()
+/// Strip any namespace prefix from an element or attribute name.
+fn local_name(raw: &str) -> String {
+    raw.rsplit(':').next().unwrap_or(raw).to_string()
 }
 
 fn attributes(e: &quick_xml::events::BytesStart<'_>) -> std::collections::HashMap<String, String> {
     let mut out = std::collections::HashMap::new();
     for a in e.attributes().flatten() {
         let key = local_name(a.key.as_ref());
-        let val = a.unescape_value().map(|v| v.to_string()).unwrap_or_default();
+        // Normalisation resolves entities and newlines in the attribute value. The parser
+        // does not track whether the document declared a version, and 1.0 and 1.1 normalise
+        // attribute values identically, so the 1.0 default is the right assumption.
+        let val = a
+            .normalized_value(quick_xml::XmlVersion::default())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
         out.insert(key, val);
     }
     out

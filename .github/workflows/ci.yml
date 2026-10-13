@@ -8,8 +8,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Riptide makes no network requests in its tests; fail loudly if one ever sneaks in.
-  RUSTFLAGS: -D warnings
+  # Deliberately no global `RUSTFLAGS: -D warnings`. RUSTFLAGS applies to dependency
+  # compilation as well as our own, so a single deprecation warning in any third-party crate
+  # would fail the whole build on one platform and not another. Warnings are denied where they
+  # belong instead: on the clippy invocation below, which only lints this workspace.
 
 jobs:
   test:
@@ -40,7 +42,9 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
       - name: Clippy
-        run: cargo clippy --workspace --all-targets
+        # `-- -D warnings` denies lints for this workspace only, unlike a RUSTFLAGS
+        # environment variable, which would also apply to every dependency compiled here.
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   msrv:
     name: minimum supported rust version

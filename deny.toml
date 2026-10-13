@@ -16,15 +16,14 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Zlib",
     "Unlicense",
     "Unicode-3.0",
     "BSL-1.0",
     "CDLA-Permissive-2.0",
     # MPL-2.0 section 3.3 explicitly permits combination with the GPL.
     "MPL-2.0",
-    # The project's own crates.
-    "GPL-3.0",
+    # Riptide's own crates. Must match the SPDX expression in the manifests exactly.
+    "GPL-3.0-or-later",
 ]
 confidence-threshold = 0.9
 

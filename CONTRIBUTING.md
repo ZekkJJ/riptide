@@ -67,7 +67,7 @@ cargo build
 cargo test --workspace
 ```
 
-Rust 1.82 or newer. No other toolchain is needed — TLS is `rustls`, so there is no OpenSSL
+Rust 1.89 or newer. No other toolchain is needed — TLS is `rustls`, so there is no OpenSSL
 dependency, and the crypto is pure Rust.
 
 To run the service and its web UI while developing:

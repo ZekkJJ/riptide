@@ -165,6 +165,15 @@ pub fn extension_of(filename: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    /// A plausible download root for the platform the tests run on.
+    fn download_root() -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(r"D:\Downloads")
+        } else {
+            PathBuf::from("/home/user/Downloads")
+        }
+    }
+
     #[test]
     fn extensions_are_extracted_from_realistic_names() {
         assert_eq!(extension_of("movie.MKV").as_deref(), Some("mkv"));
@@ -186,7 +195,8 @@ mod tests {
     #[test]
     fn files_are_routed_to_their_category_folder() {
         let set = CategorySet::standard();
-        let root = Path::new("D:\\Downloads");
+        let root = download_root();
+        let root = root.as_path();
         assert_eq!(set.folder_for(root, "film.mkv"), root.join("Video"));
         assert_eq!(set.folder_for(root, "track.flac"), root.join("Audio"));
         assert_eq!(set.folder_for(root, "setup.exe"), root.join("Programs"));
@@ -199,12 +209,17 @@ mod tests {
 
     #[test]
     fn an_absolute_category_folder_redirects_off_the_root() {
-        let mut set = CategorySet::standard();
-        set.categories[0].folder = PathBuf::from("E:\\Media\\Films");
-        assert_eq!(
-            set.folder_for(Path::new("D:\\Downloads"), "film.mkv"),
+        // What counts as absolute is platform specific: a Windows path with a drive letter is
+        // an ordinary relative name on Unix, so this has to use a genuinely absolute path for
+        // the platform the test runs on.
+        let elsewhere = if cfg!(windows) {
             PathBuf::from("E:\\Media\\Films")
-        );
+        } else {
+            PathBuf::from("/srv/media/films")
+        };
+        let mut set = CategorySet::standard();
+        set.categories[0].folder = elsewhere.clone();
+        assert_eq!(set.folder_for(&download_root(), "film.mkv"), elsewhere);
     }
 
     #[test]
