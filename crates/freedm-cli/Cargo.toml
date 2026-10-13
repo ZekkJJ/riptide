@@ -1,0 +1,23 @@
+[package]
+name = "freedm-cli"
+description = "Command line interface for the FreeDM download engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "freedm"
+path = "src/main.rs"
+
+[dependencies]
+freedm-core = { path = "../freedm-core" }
+tokio = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+indicatif = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }

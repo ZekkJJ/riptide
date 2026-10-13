@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --bg:#0f1115; --panel:#1c2029; --line:#262b36; --text:#e4e7ee; --muted:#8b93a5;
+          --accent:#4da3ff; --ok:#3ecf8e; --err:#f2555a; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#fff; --panel:#f1f3f6; --line:#dfe3ea; --text:#1a1d24; --muted:#646d7e; --accent:#1266d6; }
+  }
+  * { box-sizing:border-box; }
+  body { width:330px; margin:0; padding:13px; background:var(--bg); color:var(--text);
+         font:13px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .top { display:flex; align-items:center; gap:8px; margin-bottom:11px; }
+  .top b { font-size:14px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--err); }
+  .msg { color:var(--muted); font-size:12.5px; margin-left:auto; }
+  .item { padding:8px 0; border-top:1px solid var(--line); }
+  .item .n { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; }
+  .bar { height:4px; background:var(--panel); border-radius:2px; margin-top:5px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  .sub { color:var(--muted); font-size:11.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .none { color:var(--muted); padding:14px 0; text-align:center; font-size:12.5px; }
+  .acts { display:flex; gap:7px; margin-top:12px; }
+  button { flex:1; font:inherit; font-size:12.5px; color:var(--text); background:var(--panel);
+           border:1px solid var(--line); border-radius:7px; padding:7px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+</style>
+</head>
+<body>
+  <div class="top"><span class="dot" id="dot"></span><b>FreeDM</b><span class="msg" id="msg"></span></div>
+  <div id="list"></div>
+  <div class="acts">
+    <button id="open">Open FreeDM</button>
+    <button id="opts">Options</button>
+  </div>
+<script src="popup.js"></script>
+</body>
+</html>

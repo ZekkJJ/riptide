@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FreeDM options</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#161920; --line:#262b36; --text:#e4e7ee; --muted:#8b93a5;
+    --accent:#4da3ff; --ok:#3ecf8e; --err:#f2555a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f7f9; --panel:#fff; --line:#dfe3ea; --text:#1a1d24; --muted:#646d7e; --accent:#1266d6; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; padding:36px 20px; background:var(--bg); color:var(--text);
+    font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size:19px; margin:0 0 4px; letter-spacing:-.01em; }
+  .sub { color:var(--muted); margin:0 0 26px; }
+  section {
+    background:var(--panel); border:1px solid var(--line); border-radius:11px;
+    padding:18px; margin-bottom:14px;
+  }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 14px; }
+  label { display:grid; gap:5px; font-size:12.5px; color:var(--muted); margin-bottom:14px; }
+  label:last-child { margin-bottom:0; }
+  input[type=text], input[type=password], input[type=number] {
+    font:inherit; font-size:13px; color:var(--text); background:var(--bg);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%;
+  }
+  input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .check { display:flex; flex-direction:row; align-items:flex-start; gap:9px; color:var(--text); font-size:13.5px; }
+  .check input { width:auto; margin-top:3px; }
+  .check span small { display:block; color:var(--muted); font-size:12px; }
+  .row { display:flex; gap:10px; align-items:center; margin-top:4px; }
+  button {
+    font:inherit; font-size:13px; color:var(--text); background:var(--bg);
+    border:1px solid var(--line); border-radius:8px; padding:8px 14px; cursor:pointer;
+  }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:550; }
+  button:hover { filter:brightness(1.08); }
+  .status { font-size:13px; margin-left:auto; }
+  .status.ok { color:var(--ok); }
+  .status.bad { color:var(--err); }
+  code { font-family:ui-monospace,Consolas,monospace; font-size:12px; background:var(--bg); padding:2px 5px; border-radius:4px; }
+  p.hint { color:var(--muted); font-size:12.5px; margin:10px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FreeDM Integration</h1>
+  <p class="sub">Hand downloads from this browser to the FreeDM service running on your computer.</p>
+
+  <section>
+    <h2>Connection</h2>
+    <label>Connection token
+      <input id="token" type="password" placeholder="paste the token from FreeDM" autocomplete="off" spellcheck="false">
+    </label>
+    <label>Port
+      <input id="port" type="number" min="1" max="65535">
+    </label>
+    <div class="row">
+      <button id="test" class="primary">Save and test</button>
+      <button id="reveal" type="button">Show token</button>
+      <span class="status" id="status"></span>
+    </div>
+    <p class="hint">
+      Start the service with <code>freedmd</code>; it prints the token on startup, and
+      <code>freedmd token</code> prints it again later.
+    </p>
+  </section>
+
+  <section>
+    <h2>Capture</h2>
+    <label class="check">
+      <input id="enabled" type="checkbox">
+      <span>Take over downloads automatically
+        <small>Downloads the browser starts are handed to FreeDM instead. Right-click
+          &rarr; <em>Download with FreeDM</em> always works regardless of this setting.</small>
+      </span>
+    </label>
+    <label class="check">
+      <input id="notify" type="checkbox">
+      <span>Show a notification when a download is handed over</span>
+    </label>
+    <p class="hint">
+      Which file types are taken, the smallest size worth taking, and the excluded sites are
+      configured in FreeDM itself, so both ends stay in step.
+    </p>
+  </section>
+
+  <section>
+    <h2>Logged-in sites</h2>
+    <p class="hint" style="margin-top:0">
+      Links from a site you are signed in to usually need that site's cookies to download
+      outside the browser. Granting this lets FreeDM reuse them. It is off by default, and
+      downloads still work without it &mdash; some sites will just refuse them.
+    </p>
+    <div class="row">
+      <button id="grant" class="primary">Allow cookie access</button>
+      <button id="revoke" type="button">Revoke</button>
+      <span class="status" id="permStatus"></span>
+    </div>
+  </section>
+</div>
+
+<script src="options.js"></script>
+</body>
+</html>

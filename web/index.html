@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreeDM</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161920;
+    --panel-2: #1c2029;
+    --line: #262b36;
+    --text: #e4e7ee;
+    --muted: #8b93a5;
+    --accent: #4da3ff;
+    --accent-dim: #2b6cb0;
+    --ok: #3ecf8e;
+    --warn: #f5a524;
+    --err: #f2555a;
+    --radius: 10px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f1f3f6; --line: #dfe3ea;
+      --text: #1a1d24; --muted: #646d7e; --accent: #1266d6; --accent-dim: #8fc0f5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    background: var(--panel); position: sticky; top: 0; z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 650; font-size: 15px; letter-spacing: -.01em; }
+  .brand svg { display: block; }
+  .spacer { flex: 1 1 auto; }
+  .stat { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat b { color: var(--text); font-weight: 600; }
+
+  button, .btn {
+    font: inherit; font-size: 13px; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent-dim); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 550; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.icon { padding: 5px 9px; }
+  button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+  main { padding: 20px; max-width: 1100px; margin: 0 auto; }
+  .empty { text-align: center; color: var(--muted); padding: 64px 20px; }
+  .empty h2 { color: var(--text); font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+  .empty p { margin: 0 0 6px; }
+
+  .row {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 13px 15px; margin-bottom: 9px;
+  }
+  .row-top { display: flex; align-items: baseline; gap: 10px; }
+  .name {
+    font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1 1 auto; min-width: 0;
+  }
+  .badge {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; background: var(--panel-2); color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.running { color: var(--accent); }
+  .badge.done { color: var(--ok); }
+  .badge.failed, .badge.cancelled { color: var(--err); }
+  .badge.paused, .badge.queued, .badge.starting { color: var(--warn); }
+
+  .bar { height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin: 9px 0 7px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .35s ease; }
+  .row.done .bar > i { background: var(--ok); }
+  .row.failed .bar > i, .row.cancelled .bar > i { background: var(--err); }
+  .bar.indeterminate > i {
+    width: 32% !important; animation: slide 1.3s ease-in-out infinite;
+  }
+  @keyframes slide { 0% { margin-left: -32%; } 100% { margin-left: 100%; } }
+
+  .meta {
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+    color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  }
+  .meta .actions { margin-left: auto; display: flex; gap: 6px; }
+  .err { color: var(--err); font-size: 12.5px; margin-top: 7px; word-break: break-word; }
+  .path { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  dialog {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text);
+    padding: 0; max-width: 560px; width: calc(100% - 40px);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog h3 { margin: 0; padding: 15px 18px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .body { padding: 18px; display: grid; gap: 13px; }
+  .foot { padding: 13px 18px; border-top: 1px solid var(--line); display: flex; gap: 9px; justify-content: flex-end; }
+  label { display: grid; gap: 5px; font-size: 12.5px; color: var(--muted); }
+  input, textarea, select {
+    font: inherit; font-size: 13px; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-dim); outline-offset: -1px; }
+  textarea { resize: vertical; min-height: 58px; font-family: var(--mono); font-size: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0; }
+  code {
+    font-family: var(--mono); font-size: 12px; background: var(--panel-2);
+    padding: 2px 5px; border-radius: 4px; word-break: break-all;
+  }
+  .token-box { display: flex; gap: 8px; align-items: center; }
+  .token-box code { flex: 1 1 auto; padding: 8px 10px; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3v11m0 0 4.2-4.2M12 14l-4.2-4.2" stroke="var(--accent)" stroke-width="2.1"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 17.5v1A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5v-1" stroke="var(--muted)"
+            stroke-width="2.1" stroke-linecap="round"/>
+    </svg>
+    FreeDM
+  </div>
+  <div class="spacer"></div>
+  <div class="stat" id="totals"></div>
+  <button id="add" class="primary">Add URL</button>
+  <button id="pauseAll" class="icon" title="Pause all">Pause all</button>
+  <button id="resumeAll" class="icon" title="Resume all">Resume all</button>
+  <button id="clear" class="icon" title="Remove finished entries">Clear</button>
+  <button id="settings" class="icon" title="Settings">Settings</button>
+</header>
+
+<main>
+  <div id="list"></div>
+  <div class="empty" id="empty" hidden>
+    <h2>No downloads yet</h2>
+    <p>Add a URL above, or install the browser extension to capture downloads automatically.</p>
+    <p><button id="setup">Extension setup</button></p>
+  </div>
+</main>
+
+<dialog id="addDlg">
+  <h3>Add download</h3>
+  <form method="dialog">
+    <div class="body">
+      <label>URL
+        <input name="url" type="url" required placeholder="https://example.com/file.zip" autocomplete="off">
+      </label>
+      <div class="grid2">
+        <label>Save as <span style="opacity:.6">(optional)</span>
+          <input name="filename" placeholder="from the server" autocomplete="off">
+        </label>
+        <label>Referer <span style="opacity:.6">(optional)</span>
+          <input name="referer" placeholder="https://example.com/page" autocomplete="off">
+        </label>
+      </div>
+      <label>Cookie header <span style="opacity:.6">(for links behind a login)</span>
+        <textarea name="cookies" placeholder="session=...; csrf=..."></textarea>
+      </label>
+      <p class="hint">A link copied from a logged-in page usually needs its Referer and cookies
+        to work outside the browser. The extension captures both for you.</p>
+    </div>
+    <div class="foot">
+      <button value="cancel">Cancel</button>
+      <button value="ok" class="primary">Add</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="setDlg">
+  <h3>Settings</h3>
+  <form method="dialog">
+    <div class="body">
+      <label>Download folder
+        <input name="download_dir">
+      </label>
+      <div class="grid2">
+        <label>Connections per download
+          <input name="connections_per_download" type="number" min="1" max="64">
+        </label>
+        <label>Downloads at once
+          <input name="max_concurrent_downloads" type="number" min="1" max="20">
+        </label>
+      </div>
+      <div class="grid2">
+        <label>Total speed limit, KiB/s <span style="opacity:.6">(0 = unlimited)</span>
+          <input name="global_speed_limit_kib" type="number" min="0">
+        </label>
+        <label>Smallest capture, KiB
+          <input name="capture_min_size_kib" type="number" min="0">
+        </label>
+      </div>
+      <label>Proxy <span style="opacity:.6">(optional)</span>
+        <input name="proxy" placeholder="http://host:8080 or socks5://host:1080">
+      </label>
+      <label style="display:flex;flex-direction:row;align-items:center;gap:8px;color:var(--text)">
+        <input name="categorize" type="checkbox" style="width:auto">
+        File into category folders (Video, Audio, Archives, ...)
+      </label>
+    </div>
+    <div class="foot">
+      <button value="cancel">Cancel</button>
+      <button value="ok" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="setupDlg">
+  <h3>Browser extension setup</h3>
+  <div class="body">
+    <p class="hint" style="margin:0">
+      Load <code>extension/</code> from the FreeDM folder as an unpacked extension
+      (<code>chrome://extensions</code> &rarr; Developer mode &rarr; Load unpacked), then open
+      its options and paste this token.
+    </p>
+    <label>Connection token
+      <div class="token-box">
+        <code id="tok"></code>
+        <button id="copyTok" type="button">Copy</button>
+      </div>
+    </label>
+    <p class="hint" style="margin:0">
+      The token is what stops any web page from queueing downloads on your machine, so treat it
+      like a password. It lives in your FreeDM config file and never leaves this computer.
+    </p>
+  </div>
+  <div class="foot"><button id="setupClose" class="primary">Done</button></div>
+</dialog>
+
+<script>
+const TOKEN = "__FREEDM_TOKEN__";
+const H = { "Content-Type": "application/json", "X-FreeDM-Token": TOKEN };
+const $ = (s) => document.querySelector(s);
+const items = new Map();
+
+const fmtBytes = (n) => {
+  if (n === null || n === undefined) return "?";
+  const u = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let v = n, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (i === 0 ? v : v.toFixed(1)) + " " + u[i];
+};
+const fmtDur = (s) => {
+  if (s === null || s === undefined) return null;
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s";
+  return Math.floor(s / 3600) + "h" + String(Math.floor((s % 3600) / 60)).padStart(2, "0") + "m";
+};
+
+async function api(path, opts = {}) {
+  const r = await fetch("/api" + path, { headers: H, ...opts });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).error || detail; } catch {}
+    throw new Error(detail);
+  }
+  return r.status === 204 ? null : r.json().catch(() => null);
+}
+
+function render() {
+  const list = $("#list");
+  const all = [...items.values()];
+  $("#empty").hidden = all.length > 0;
+
+  let speed = 0, active = 0;
+  for (const it of all) {
+    if (it.status === "running" || it.status === "starting") { speed += it.progress.speed || 0; active++; }
+  }
+  $("#totals").innerHTML = all.length
+    ? `<b>${active}</b> active &middot; <b>${fmtBytes(speed)}/s</b>`
+    : "";
+
+  list.innerHTML = "";
+  for (const it of all) {
+    const p = it.progress || {};
+    const pct = p.total ? Math.min(100, (p.downloaded / p.total) * 100) : 0;
+    const live = it.status === "running" || it.status === "starting";
+    const indet = live && !p.total;
+
+    const el = document.createElement("div");
+    el.className = "row " + it.status;
+
+    const stalled = live && p.stalled;
+    const bits = [];
+    bits.push(`${fmtBytes(p.downloaded || 0)} / ${fmtBytes(p.total)}`);
+    if (stalled) {
+      // Saying "8 connections" beside a bar that has not moved for a while is misleading.
+      bits.push(`<span style="color:var(--warn)">no response, retrying</span>`);
+    } else if (live) {
+      bits.push(`${fmtBytes(p.speed || 0)}/s`);
+      if (p.connections) bits.push(`${p.connections} conn`);
+      if (p.segments > 1) bits.push(`${p.segments} seg`);
+      const eta = fmtDur(p.eta_secs);
+      if (eta) bits.push("eta " + eta);
+    }
+
+    const can = {
+      pause: live || it.status === "queued",
+      resume: it.status === "paused" || it.status === "failed",
+      cancel: live || it.status === "queued" || it.status === "paused",
+    };
+
+    el.innerHTML = `
+      <div class="row-top">
+        <span class="name" title="${esc(it.filename)}">${esc(it.filename)}</span>
+        <span class="badge ${it.status}">${it.status}</span>
+        ${p.total ? `<span class="stat">${pct.toFixed(1)}%</span>` : ""}
+      </div>
+      <div class="bar ${indet ? "indeterminate" : ""}"><i style="width:${pct}%"></i></div>
+      <div class="meta">
+        <span>${bits.join(" &middot; ")}</span>
+        <span class="actions">
+          ${can.pause ? `<button class="icon" data-act="pause">Pause</button>` : ""}
+          ${can.resume ? `<button class="icon" data-act="resume">Resume</button>` : ""}
+          ${can.cancel ? `<button class="icon" data-act="cancel">Stop</button>` : ""}
+          <button class="icon" data-act="remove">Remove</button>
+        </span>
+      </div>
+      ${it.error ? `<div class="err">${esc(it.error)}</div>` : ""}
+      ${it.path && it.status === "done" ? `<div class="path">${esc(it.path)}</div>` : ""}
+    `;
+    el.querySelectorAll("button[data-act]").forEach((b) => {
+      b.onclick = async () => {
+        const act = b.dataset.act;
+        b.disabled = true;
+        try {
+          if (act === "remove") {
+            await api(`/downloads/${it.id}`, { method: "DELETE" });
+            items.delete(it.id);
+            render();
+          } else {
+            await api(`/downloads/${it.id}/${act}`, { method: "POST" });
+          }
+        } catch (e) {
+          alert(e.message);
+          b.disabled = false;
+        }
+      };
+    });
+    list.appendChild(el);
+  }
+}
+
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function load() {
+  try {
+    for (const it of await api("/downloads")) items.set(it.id, it);
+    render();
+  } catch (e) {
+    document.body.innerHTML =
+      `<main><div class="empty"><h2>Cannot reach the FreeDM service</h2>
+       <p>${esc(e.message)}</p></div></main>`;
+  }
+}
+
+function connect() {
+  const es = new EventSource("/api/events?token=" + encodeURIComponent(TOKEN));
+  es.onmessage = (ev) => {
+    const e = JSON.parse(ev.data);
+    if (e.type === "removed") items.delete(e.id);
+    else if (e.item) items.set(e.item.id, e.item);
+    render();
+  };
+  // A dropped stream means the service restarted or the machine slept; resync and reconnect.
+  es.onerror = () => { es.close(); setTimeout(() => { load(); connect(); }, 2000); };
+}
+
+$("#add").onclick = () => $("#addDlg").showModal();
+$("#addDlg").addEventListener("close", async (e) => {
+  const dlg = $("#addDlg");
+  if (dlg.returnValue !== "ok") return;
+  const f = new FormData(dlg.querySelector("form"));
+  const body = { url: f.get("url"), source: "web" };
+  for (const k of ["filename", "referer", "cookies"]) {
+    const v = (f.get(k) || "").trim();
+    if (v) body[k] = v;
+  }
+  try {
+    await api("/downloads", { method: "POST", body: JSON.stringify(body) });
+    dlg.querySelector("form").reset();
+  } catch (err) { alert(err.message); }
+});
+
+$("#pauseAll").onclick = () => api("/pause-all", { method: "POST" }).catch((e) => alert(e.message));
+$("#resumeAll").onclick = () => api("/resume-all", { method: "POST" }).catch((e) => alert(e.message));
+$("#clear").onclick = async () => {
+  try {
+    await api("/clear-finished", { method: "POST" });
+    for (const [id, it] of items)
+      if (["done", "failed", "cancelled"].includes(it.status)) items.delete(id);
+    render();
+  } catch (e) { alert(e.message); }
+};
+
+$("#settings").onclick = async () => {
+  try {
+    const cfg = await api("/config");
+    const form = $("#setDlg form");
+    form.download_dir.value = cfg.download_dir ?? "";
+    form.connections_per_download.value = cfg.connections_per_download;
+    form.max_concurrent_downloads.value = cfg.max_concurrent_downloads;
+    form.global_speed_limit_kib.value = Math.round((cfg.global_speed_limit || 0) / 1024);
+    form.capture_min_size_kib.value = Math.round((cfg.capture_min_size || 0) / 1024);
+    form.proxy.value = cfg.proxy ?? "";
+    form.categorize.checked = !!cfg.categorize;
+    $("#setDlg").showModal();
+  } catch (e) { alert(e.message); }
+};
+$("#setDlg").addEventListener("close", async (e) => {
+  if ($("#setDlg").returnValue !== "ok") return;
+  const form = $("#setDlg form");
+  const patch = {
+    download_dir: form.download_dir.value.trim(),
+    connections_per_download: +form.connections_per_download.value,
+    max_concurrent_downloads: +form.max_concurrent_downloads.value,
+    global_speed_limit: Math.max(0, +form.global_speed_limit_kib.value) * 1024,
+    capture_min_size: Math.max(0, +form.capture_min_size_kib.value) * 1024,
+    proxy: form.proxy.value.trim() || null,
+    categorize: form.categorize.checked,
+  };
+  try { await api("/config", { method: "PUT", body: JSON.stringify(patch) }); }
+  catch (e) { alert(e.message); }
+});
+
+$("#tok").textContent = TOKEN;
+const openSetup = () => $("#setupDlg").showModal();
+$("#setup").onclick = openSetup;
+$("#setupClose").onclick = () => $("#setupDlg").close();
+$("#copyTok").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(TOKEN);
+    $("#copyTok").textContent = "Copied";
+    setTimeout(() => ($("#copyTok").textContent = "Copy"), 1400);
+  } catch { alert("Could not copy. Select the token and copy it by hand."); }
+};
+
+load().then(connect);
+</script>
+</body>
+</html>
