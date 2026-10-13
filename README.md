@@ -7,7 +7,7 @@
 Multi-connection downloads, resume that cannot corrupt your file, browser capture,
 and HLS/DASH video — with no licence key, no trial, and no kernel driver.
 
-[![CI](https://github.com/Bloxive/riptide/actions/workflows/ci.yml/badge.svg)](https://github.com/Bloxive/riptide/actions/workflows/ci.yml)
+[![CI](https://github.com/ZekkJJ/riptide/actions/workflows/ci.yml/badge.svg)](https://github.com/ZekkJJ/riptide/actions/workflows/ci.yml)
 [![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange)](https://www.rust-lang.org)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#quick-start)
@@ -41,7 +41,7 @@ No telemetry. Riptide makes no network request you did not ask for.
 ## Quick start
 
 ```bash
-git clone https://github.com/Bloxive/riptide
+git clone https://github.com/ZekkJJ/riptide
 cd riptide
 cargo build --release
 ```

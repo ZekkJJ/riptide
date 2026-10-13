@@ -5,7 +5,7 @@
 **Please do not open a public issue for a security problem.**
 
 Report it privately through GitHub's [private vulnerability
-reporting](https://github.com/Bloxive/riptide/security/advisories/new) on this repository. If
+reporting](https://github.com/ZekkJJ/riptide/security/advisories/new) on this repository. If
 that is unavailable to you, open an issue titled `security: request contact` with no details,
 and a maintainer will arrange a private channel.
 

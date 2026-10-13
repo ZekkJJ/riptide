@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for the report. Please do not use this form for security problems — see
-        [SECURITY.md](https://github.com/Bloxive/riptide/blob/main/SECURITY.md) instead.
+        [SECURITY.md](https://github.com/ZekkJJ/riptide/blob/main/SECURITY.md) instead.
 
   - type: textarea
     id: what

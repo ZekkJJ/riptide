@@ -54,5 +54,5 @@ First public release.
 FTP, site grabber, ZIP preview, scheduler, Firefox extension, automatic link recapture on
 expiry, and media conversion.
 
-[Unreleased]: https://github.com/Bloxive/riptide/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Bloxive/riptide/releases/tag/v0.1.0
+[Unreleased]: https://github.com/ZekkJJ/riptide/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ZekkJJ/riptide/releases/tag/v0.1.0

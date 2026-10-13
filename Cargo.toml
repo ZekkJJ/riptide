@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/Bloxive/riptide"
+repository = "https://github.com/ZekkJJ/riptide"
 authors = ["Riptide contributors"]
 
 [workspace.dependencies]

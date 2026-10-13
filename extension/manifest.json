@@ -3,7 +3,7 @@
   "name": "Riptide Integration",
   "version": "0.1.0",
   "description": "Hand downloads from your browser to Riptide, the free and open source download manager.",
-  "homepage_url": "https://github.com/Bloxive/riptide",
+  "homepage_url": "https://github.com/ZekkJJ/riptide",
 
   "background": { "service_worker": "background.js" },
 

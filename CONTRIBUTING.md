@@ -61,7 +61,7 @@ GPL-3.0-or-later; there is no copyright assignment, and contributors keep their 
 ## Getting set up
 
 ```bash
-git clone https://github.com/Bloxive/riptide
+git clone https://github.com/ZekkJJ/riptide
 cd riptide
 cargo build
 cargo test --workspace
