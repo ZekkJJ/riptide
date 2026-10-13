@@ -30,7 +30,7 @@ percent-encoding = { workspace = true }
 dirs = { workspace = true }
 # Pure-Rust AES-128-CBC, for standard (non-DRM) HLS segment decryption. aes 0.8 and
 # cbc 0.1 are the pair built on cipher 0.4; newer majors of either need the other bumped too.
-aes = "0.8"
+aes = "0.9"
 cbc = { version = "0.1.2", features = ["alloc"] }
 
 [dev-dependencies]
