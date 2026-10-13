@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/freedm-core", "crates/freedm-cli", "crates/freedm-daemon"]
+members = ["crates/riptide-core", "crates/riptide-cli", "crates/riptide-daemon"]
 resolver = "2"
 
 [workspace.package]
@@ -7,8 +7,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/Bloxive/freedm"
-authors = ["FreeDM contributors"]
+repository = "https://github.com/Bloxive/riptide"
+authors = ["Riptide contributors"]
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "net", "sync", "time", "io-util", "signal"] }

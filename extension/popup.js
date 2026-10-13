@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Riptide contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 const $ = (id) => document.getElementById(id);
 
 const fmt = (n) => {
@@ -17,7 +20,7 @@ async function render() {
     $("dot").className = "dot bad";
     $("msg").textContent = res?.error || "not connected";
     $("list").innerHTML =
-      `<div class="none">Start <code>freedmd</code> and set the token in Options.</div>`;
+      `<div class="none">Start <code>riptided</code> and set the token in Options.</div>`;
     return;
   }
   $("dot").className = "dot ok";

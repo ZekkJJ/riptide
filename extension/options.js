@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Riptide contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 const DEFAULTS = { port: 7739, token: "", enabled: true, notify: true };
 const $ = (id) => document.getElementById(id);
 
@@ -30,7 +33,7 @@ $("test").onclick = async () => {
   // The service worker holds the token and does the request, so it stays in one place.
   const res = await chrome.runtime.sendMessage({ kind: "status" });
   if (res?.ok) {
-    setStatus($("status"), `Connected to FreeDM ${res.version || ""}`.trim(), true);
+    setStatus($("status"), `Connected to Riptide ${res.version || ""}`.trim(), true);
   } else {
     setStatus($("status"), res?.error || "Could not connect", false);
   }

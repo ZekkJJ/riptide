@@ -1,11 +1,14 @@
+// SPDX-FileCopyrightText: Riptide contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
- * FreeDM browser integration.
+ * Riptide browser integration.
  *
  * Chrome's downloads API is the interception point rather than blocking webRequest, which
  * Manifest V3 removed: `downloads.onCreated` fires as soon as the browser decides a response
  * is a download, and gives the URL, referrer, filename, media type and size. If the download
  * matches the rules the service supplies, it is cancelled and erased from the browser's own
- * list and handed to FreeDM instead.
+ * list and handed to Riptide instead.
  *
  * Cookies are attached when the user has granted host access, because a link from a logged-in
  * page usually will not fetch without them. Access is optional and requested from the options
@@ -39,7 +42,7 @@ async function api(path, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "X-FreeDM-Token": settings.token,
+      "X-Riptide-Token": settings.token,
       ...(options.headers || {}),
     },
   });
@@ -71,7 +74,7 @@ function setOnline(ok, detail) {
   chrome.action.setBadgeText({ text: ok ? "" : "!" });
   chrome.action.setBadgeBackgroundColor({ color: ok ? "#3ecf8e" : "#f2555a" });
   chrome.action.setTitle({
-    title: ok ? "FreeDM: connected" : `FreeDM: not connected${detail ? " — " + detail : ""}`,
+    title: ok ? "Riptide: connected" : `Riptide: not connected${detail ? " — " + detail : ""}`,
   });
 }
 
@@ -123,7 +126,7 @@ function shouldCapture(item) {
   const size = item.fileSize > 0 ? item.fileSize : item.totalBytes;
   const min = rules.min_size ?? settings.minSize;
   // An unknown size is allowed through: it is usually a stream, which is exactly the case
-  // FreeDM handles better than the browser.
+  // Riptide handles better than the browser.
   if (size > 0 && size < min) return false;
 
   const list = rules.extensions || [];
@@ -156,7 +159,7 @@ async function handOff({ url, filename, referer, source }) {
 
   const item = await api("/downloads", { method: "POST", body: JSON.stringify(body) });
   if (settings.notify) {
-    notify("Sent to FreeDM", item?.filename || url);
+    notify("Sent to Riptide", item?.filename || url);
   }
   return item;
 }
@@ -184,14 +187,14 @@ chrome.downloads.onCreated.addListener(async (item) => {
   try {
     await handOff({ url, filename, referer: item.referrer || undefined });
   } catch (e) {
-    // FreeDM would not take it, so leave the browser's own download running rather than
+    // Riptide would not take it, so leave the browser's own download running rather than
     // cancelling it and losing the download altogether.
-    notify("FreeDM could not take this download", e.message + " — the browser will continue it");
+    notify("Riptide could not take this download", e.message + " — the browser will continue it");
     setOnline(false, e.message);
     return;
   }
 
-  // Only now that FreeDM has it is it safe to stop the browser's copy.
+  // Only now that Riptide has it is it safe to stop the browser's copy.
   try {
     await chrome.downloads.cancel(item.id);
     await chrome.downloads.erase({ id: item.id });
@@ -201,9 +204,9 @@ chrome.downloads.onCreated.addListener(async (item) => {
 });
 
 const MENUS = [
-  { id: "freedm-link", title: "Download with FreeDM", contexts: ["link"] },
-  { id: "freedm-media", title: "Download this with FreeDM", contexts: ["image", "video", "audio"] },
-  { id: "freedm-page", title: "Open FreeDM", contexts: ["action"] },
+  { id: "riptide-link", title: "Download with Riptide", contexts: ["link"] },
+  { id: "riptide-media", title: "Download this with Riptide", contexts: ["image", "video", "audio"] },
+  { id: "riptide-page", title: "Open Riptide", contexts: ["action"] },
 ];
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -223,7 +226,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   await loadSettings();
-  if (info.menuItemId === "freedm-page") {
+  if (info.menuItemId === "riptide-page") {
     chrome.tabs.create({ url: base() + "/" });
     return;
   }
@@ -234,7 +237,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     // that govern automatic capture are not applied here.
     await handOff({ url, referer: info.pageUrl || tab?.url, source: "browser" });
   } catch (e) {
-    notify("FreeDM could not take this download", e.message);
+    notify("Riptide could not take this download", e.message);
   }
 });
 

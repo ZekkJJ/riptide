@@ -461,64 +461,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "freedm-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "freedm-core",
- "indicatif",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "freedm-core"
-version = "0.1.0"
-dependencies = [
- "aes",
- "bytes",
- "cbc",
- "chrono",
- "dirs",
- "futures-util",
- "percent-encoding",
- "quick-xml",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tokio",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "freedm-daemon"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "dirs",
- "freedm-core",
- "futures-util",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1303,6 +1245,64 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "riptide-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "indicatif",
+ "riptide-core",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "riptide-core"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "bytes",
+ "cbc",
+ "chrono",
+ "dirs",
+ "futures-util",
+ "percent-encoding",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "riptide-daemon"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "dirs",
+ "futures-util",
+ "reqwest",
+ "riptide-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
 ]
 
 [[package]]

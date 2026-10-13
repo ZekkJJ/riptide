@@ -1,8 +1,10 @@
 <!doctype html>
+<!-- SPDX-FileCopyrightText: Riptide contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>FreeDM options</title>
+<title>Riptide options</title>
 <style>
   :root {
     --bg:#0f1115; --panel:#161920; --line:#262b36; --text:#e4e7ee; --muted:#8b93a5;
@@ -50,13 +52,13 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>FreeDM Integration</h1>
-  <p class="sub">Hand downloads from this browser to the FreeDM service running on your computer.</p>
+  <h1>Riptide Integration</h1>
+  <p class="sub">Hand downloads from this browser to the Riptide service running on your computer.</p>
 
   <section>
     <h2>Connection</h2>
     <label>Connection token
-      <input id="token" type="password" placeholder="paste the token from FreeDM" autocomplete="off" spellcheck="false">
+      <input id="token" type="password" placeholder="paste the token from Riptide" autocomplete="off" spellcheck="false">
     </label>
     <label>Port
       <input id="port" type="number" min="1" max="65535">
@@ -67,8 +69,8 @@
       <span class="status" id="status"></span>
     </div>
     <p class="hint">
-      Start the service with <code>freedmd</code>; it prints the token on startup, and
-      <code>freedmd token</code> prints it again later.
+      Start the service with <code>riptided</code>; it prints the token on startup, and
+      <code>riptided token</code> prints it again later.
     </p>
   </section>
 
@@ -77,8 +79,8 @@
     <label class="check">
       <input id="enabled" type="checkbox">
       <span>Take over downloads automatically
-        <small>Downloads the browser starts are handed to FreeDM instead. Right-click
-          &rarr; <em>Download with FreeDM</em> always works regardless of this setting.</small>
+        <small>Downloads the browser starts are handed to Riptide instead. Right-click
+          &rarr; <em>Download with Riptide</em> always works regardless of this setting.</small>
       </span>
     </label>
     <label class="check">
@@ -87,7 +89,7 @@
     </label>
     <p class="hint">
       Which file types are taken, the smallest size worth taking, and the excluded sites are
-      configured in FreeDM itself, so both ends stay in step.
+      configured in Riptide itself, so both ends stay in step.
     </p>
   </section>
 
@@ -95,7 +97,7 @@
     <h2>Logged-in sites</h2>
     <p class="hint" style="margin-top:0">
       Links from a site you are signed in to usually need that site's cookies to download
-      outside the browser. Granting this lets FreeDM reuse them. It is off by default, and
+      outside the browser. Granting this lets Riptide reuse them. It is off by default, and
       downloads still work without it &mdash; some sites will just refuse them.
     </p>
     <div class="row">

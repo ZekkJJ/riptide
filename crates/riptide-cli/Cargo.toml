@@ -1,0 +1,28 @@
+[package]
+name = "riptide-cli"
+description = "Command line interface for the Riptide download manager"
+keywords = ["download", "download-manager", "http", "hls", "dash"]
+categories = ["command-line-utilities", "network-programming", "multimedia"]
+readme = "../../README.md"
+homepage = "https://github.com/Bloxive/riptide"
+documentation = "https://docs.rs/riptide-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "riptide"
+path = "src/main.rs"
+
+[dependencies]
+riptide-core = { path = "../riptide-core" }
+tokio = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+indicatif = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }

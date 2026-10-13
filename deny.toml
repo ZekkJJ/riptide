@@ -1,0 +1,43 @@
+# cargo-deny configuration.
+#
+# Riptide ships under GPL-3.0-or-later, so a dependency under a licence that cannot be
+# combined with the GPL is a release blocker rather than a style question. CI gates on this.
+
+[graph]
+all-features = true
+
+[licenses]
+# Every entry below has been checked as compatible with GPL-3.0-or-later. Adding to this list
+# is a deliberate decision: confirm compatibility before you do.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unlicense",
+    "Unicode-3.0",
+    "BSL-1.0",
+    "CDLA-Permissive-2.0",
+    # MPL-2.0 section 3.3 explicitly permits combination with the GPL.
+    "MPL-2.0",
+    # The project's own crates.
+    "GPL-3.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[advisories]
+# Fail on any dependency with a known vulnerability.
+yanked = "deny"
+ignore = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -1,9 +1,11 @@
 <!doctype html>
+<!-- SPDX-FileCopyrightText: Riptide contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FreeDM</title>
+<title>Riptide</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -130,7 +132,7 @@
       <path d="M4 17.5v1A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5v-1" stroke="var(--muted)"
             stroke-width="2.1" stroke-linecap="round"/>
     </svg>
-    FreeDM
+    Riptide
   </div>
   <div class="spacer"></div>
   <div class="stat" id="totals"></div>
@@ -220,7 +222,7 @@
   <h3>Browser extension setup</h3>
   <div class="body">
     <p class="hint" style="margin:0">
-      Load <code>extension/</code> from the FreeDM folder as an unpacked extension
+      Load <code>extension/</code> from the Riptide folder as an unpacked extension
       (<code>chrome://extensions</code> &rarr; Developer mode &rarr; Load unpacked), then open
       its options and paste this token.
     </p>
@@ -232,15 +234,15 @@
     </label>
     <p class="hint" style="margin:0">
       The token is what stops any web page from queueing downloads on your machine, so treat it
-      like a password. It lives in your FreeDM config file and never leaves this computer.
+      like a password. It lives in your Riptide config file and never leaves this computer.
     </p>
   </div>
   <div class="foot"><button id="setupClose" class="primary">Done</button></div>
 </dialog>
 
 <script>
-const TOKEN = "__FREEDM_TOKEN__";
-const H = { "Content-Type": "application/json", "X-FreeDM-Token": TOKEN };
+const TOKEN = "__RIPTIDE_TOKEN__";
+const H = { "Content-Type": "application/json", "X-Riptide-Token": TOKEN };
 const $ = (s) => document.querySelector(s);
 const items = new Map();
 
@@ -362,7 +364,7 @@ async function load() {
     render();
   } catch (e) {
     document.body.innerHTML =
-      `<main><div class="empty"><h2>Cannot reach the FreeDM service</h2>
+      `<main><div class="empty"><h2>Cannot reach the Riptide service</h2>
        <p>${esc(e.message)}</p></div></main>`;
   }
 }

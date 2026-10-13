@@ -1,4 +1,7 @@
-"""Generate the FreeDM extension icons: a download arrow over a tray.
+# SPDX-FileCopyrightText: Riptide contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Generate the Riptide extension icons: a download arrow over a tray.
 
 Pure stdlib PNG writing, so the repo needs no image toolchain to regenerate them.
 """

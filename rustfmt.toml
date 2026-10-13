@@ -1,0 +1,5 @@
+# Riptide formats with a slightly wider line than the default, which suits the engine's
+# descriptive names and keeps most match arms on one line.
+max_width = 100
+use_small_heuristics = "Max"
+edition = "2021"

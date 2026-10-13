@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest something Riptide should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check CONTRIBUTING.md first. A few things are settled decisions and will be
+        closed: DRM circumvention, anything touching another program's licensing, kernel
+        drivers, broader extension permissions, and telemetry.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve
+      description: Describe the situation you are in, not just the feature you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you already tried
+      description: Other tools, workarounds, or approaches you considered.

@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "FreeDM Integration",
+  "name": "Riptide Integration",
   "version": "0.1.0",
-  "description": "Hand downloads from your browser to FreeDM, the free and open source download manager.",
-  "homepage_url": "https://github.com/Bloxive/freedm",
+  "description": "Hand downloads from your browser to Riptide, the free and open source download manager.",
+  "homepage_url": "https://github.com/Bloxive/riptide",
 
   "background": { "service_worker": "background.js" },
 
   "action": {
-    "default_title": "FreeDM",
+    "default_title": "Riptide",
     "default_popup": "popup.html",
     "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" }
   },
